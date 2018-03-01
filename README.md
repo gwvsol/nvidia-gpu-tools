@@ -1,7 +1,7 @@
 # nvidia-gpu-tools
 Monitoring the operation of video cards NVIDIA, control the frequency of video memory and graphics processor
 
-Программа проверки работы видеокарт NVIDIA -V4.
+Программа проверки работы видеокарт NVIDIA - testGPU.
 
 Программа запускается в автоматическом режиме через cron с интервалом 1 минута. 
 Ее так же можно запустить вручную используя следующие параметры
