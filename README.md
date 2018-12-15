@@ -1,4 +1,4 @@
-# nvidia-gpu-tools
+# Nvidia GPU Tools
 Monitoring the operation of video cards NVIDIA, control the frequency of video memory and graphics processor
 
 Программа проверки работы видеокарт NVIDIA - testGPU.
