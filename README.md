@@ -1,10 +1,15 @@
 # Nvidia GPU Tools
----
+***
 *Monitoring the operation of video cards NVIDIA, control the frequency of video memory and graphics processor*
 
-##Программа проверки работы видеокарт NVIDIA - testGPU.
+## Проверка работы видеокарт NVIDIA - testGPU.
 
-Программа запускается в автоматическом режиме через cron с интервалом 1 минута. 
+Скрипт запускается в автоматическом режиме через cron с интервалом 2 минуты.
+```shell
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+*/2 * * * * /usr/local/bin/testGPU
+```
 Ее так же можно запустить вручную используя следующие параметры
 testGPU chk - проверка видеокарт
 testGPU on - включение проверки видеокарт с сохранением параметра во временном файле конфигурации
