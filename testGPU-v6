@@ -1,0 +1,194 @@
+#!/bin/bash
+# testGPU-v6
+# ===========================================================================
+name=testGPU # Имя скрипта
+# ==========================================================================
+dir="/opt/mining" # Каталог для временного config файла
+confDir="/opt/mining"
+conf=".gpu.cfg" # Временный config файл в котором храниться параметр включена 
+	            # или выключена проверка работы видеокарт
+TMPConf="$confDir/$conf"
+conkym=".conky.msg"
+Conky=$confDir/$conkym
+logfile=".testGPU.log"
+GPUlog="$confDir/$logfile" # Log файл работы скрипта 
+now=$(date +'%d-%m-%Y %T') # Формат даты
+time1=15 # Время ожидания от обнаружения выпадания карты до повторной проверки
+time2=25 # Время ожидания от повторной проверки до окончательной проверки состояния видеокарт
+Uptime=$(awk '{print int($1/60)}' /proc/uptime) # Время работы системы
+delay=4 # Время в минутах в течении которого после запуска системы не будет проверяться работа видеокарт
+inp=$1 # Переменная для передачи введенного параметра в функции скрипта
+# Cчитываем количество видеокарт в системе
+setGPU=$(lspci | grep NVIDIA | grep VGA | wc -l)
+
+#===============================================
+# Проверка включена ли проверка работы видеокарт
+OnOfftestGPU() 
+{
+   OnOff=$(cat $dir/$conf)
+   if [ $OnOff = "off" ] ; then
+      now=$(date +'%d-%m-%Y %T')
+      echo -e "\e[1;31mПроверка работы видекарт отключена, выход из программы проверки\e[0m"
+      echo $now "Проверка работы видекарт отключена, выход из программы проверки" >> $GPUlog
+      exit 0
+   fi 
+}
+
+GPUUtiliz() 
+{
+    NoCard=0
+    # Считываем загрузку каждой видеокарты в системе
+    for (( i=0; i < $setGPU; i++))
+    do
+    uGPU=$(nvidia-smi --id=$i --query-gpu=utilization.gpu --format=csv | \
+        awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    pGPU=$(bc <<< $(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
+        awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')/1)
+    # Если какой-то видеокарты нет в системе, заменяем отсутствие данных 0
+    if [ -z $uGPU ] ; then
+        uGPU=0
+    else
+        uGPU=$uGPU
+    fi
+    if [ -z $pGPU ] ; then
+        let "NoCard += 1"
+    fi
+    # Суммируем все данные о загрузке видеокарт
+    let "tGPU += $uGPU"
+    done
+    # Определяем среднюю загрузку видеокарт
+    avGPU=0
+    let "avGPU = $tGPU / $setGPU"
+    tGPU=0
+    now=$(date +'%d-%m-%Y %T')
+    echo "$now Средняя загрузка $setGPU GPU $avGPU%" >> $GPUlog 
+}
+
+TestUtiliz()
+{
+# Проверяем загрузку видеокарт
+GPUUtiliz
+now=$(date +'%d-%m-%Y %T')
+if [[ $NoCard -gt 0 ]] ; then
+    sleep $time1
+    GPUUtiliz
+    now=$(date +'%d-%m-%Y %T')
+    if [[ $NoCard -gt 0 ]] ; then
+        echo "$now В системе отсутсвует одна из $setGPU GPU, повторная проверка..." >> $GPUlog
+    else
+        echo "$now В системе $setGPU GPU" >> $GPUlog
+        exit 0
+    fi
+    sleep $time2
+    GPUUtiliz
+    now=$(date +'%d-%m-%Y %T')
+    if [[ $NoCard -gt 0 ]] ; then
+	echo "$now Перезагрузка системы" >> $GPUlog
+	#sudo reboot
+    else
+        echo "$now В системе $setGPU GPU" >> $GPUlog
+        exit 0
+    fi
+else
+    echo "$now В системе работает $setGPU GPU" >> $GPUlog
+    exit 0
+fi
+}
+
+# Выбор режима работы скрипта
+swcase() 
+{
+now=$(date +'%d-%m-%Y %T')
+case $input in
+1 | "chk" ) echo -e "\e[37mПроверка работы видеокарт\e[0m"
+	echo $now "Проверка работы видеокарт" >> $GPUlog 
+   	OnOfftestGPU
+	TestUtiliz ;; 
+2 | "on") echo -e "\e[33mПроверка работы видеокарт включена\e[0m"
+	echo $now "Проверка работы видеокарт включена" >> $GPUlog 
+	echo "on" > $dir/$conf ;;
+3 | "off") echo -e "\e[1;31mПроверка работы видеокарт выключена\e[0m"
+	echo $now "Проверка работы видеокарт выключена" >> $GPUlog 
+	echo "off" > $dir/$conf ;;
+"man") echo -e "\e[37mДля управления программой проверки видеокарт:\e[0m"
+	echo -e "\e[36mchk\e[0m - проверка видеокарт"
+	echo -e "\e[36mon\e[0m - включение проверки видеокарт"
+	echo -e "\e[36moff\e[0m - выключение проверки видеокарт"
+	echo -e "\e[36mman\e[0m - показать эту справку" ;;
+*) echo -e "\e[37mЗавершение работы программы\e[0m"
+	echo $now "Завершение работы программы" >> $GPUlog ;;
+esac 
+}
+
+#  Приветствие работы скрипта и чтений введенных параметров с клавиатуры
+inputRead() 
+{
+   echo -e "\e[33mПрограмма проверки работы видеокарт\e[0m"
+   OnOff=$(cat $dir/$conf) 
+   if [ $OnOff = "on" ] ; then
+      	echo -e "\e[35mПроверка работы видекарт включена\e[0m"
+	echo -e "Продолжить проверку видеокарт: \e[1;35m1\e[0m"
+   fi
+   if [ $OnOff = "off" ] ; then
+      	echo -e "\e[1;31mПроверка работы видекарт выключена\e[0m"
+   fi
+   echo -e "Включить проверку работы видеокарт: \e[1;35m2\e[0m"
+   echo -e "Выключить проверку работы видеокарт: \e[1;35m3\e[0m" 
+   echo -e "\e[37mЛюбая другая клавиша, завершение работы программы\e[0m"
+   echo -e "\e[36mВаш выбор: \e[0m"; read input
+swcase 
+}
+
+# Проверка переданных параметров скрипту
+checkOpt() 
+{
+    if [ -z $inp ] ; then
+       inputRead
+    else
+       input=$inp
+       swcase
+    fi 
+}
+
+# Проверяем наличие временного файла настроек проверки видеокарт
+# Если временного файла настроек нет, он будет создан и в него 
+# будет вписана переменная о включении проверки "on"
+testConf() 
+{
+    if [ -f $TMPConf ] ; then
+       true
+    else : > $TMPConf ; echo "on" > $TMPConf
+    fi
+    if [ -f $Conky ] ; then
+        true
+    else : > $Conky
+    fi 
+}
+
+checkUpTime() 
+{
+    if [ $Uptime -lt $delay ] ; then
+    echo $now Система включена менее $delay минут >> $GPUlog   
+    exit 0
+    fi 
+}
+
+mainfunction() 
+{
+if [ -t 0 ] ; then
+#   echo $now "$name запущен вручную" >> $GPUlog
+   testConf
+   checkOpt
+   sleep 1
+   exit 0
+else
+#   echo $now "$name запушен в cron" >> $GPUlog
+   testConf
+   checkUpTime
+   OnOfftestGPU
+   TestUtiliz
+   exit 0
+fi 
+}
+
+mainfunction
