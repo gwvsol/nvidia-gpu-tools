@@ -46,18 +46,14 @@ GPUUtiliz()
         pGPU=$(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
             awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
         # Если загрузки какой-то видеокарты нет в, заменяем отсутствие данных 0
-        if [ -z $uGPU ] ; then
-            uGPU=0
-        else
-            uGPU=$uGPU
+        if [ -z $uGPU ] ; then uGPU=0
+        else uGPU=$uGPU
         fi
         # Если загрузка какой-то видеокарты равна 0, увеличиваем переменную $NoUtil на 1
-        if [[ $uGPU -lt 1 ]] ; then
-            let "NoUtil += 1"
+        if [[ $uGPU -lt 1 ]] ; then let "NoUtil += 1"
         fi
         # Если мощности какой-то видеокарты нет в, увеличиваем переменную $NoCard на 1
-        if [ -z $pGPU ] ; then
-            let "NoCard += 1"
+        if [ -z $pGPU ] ; then let "NoCard += 1"
         fi
         # Суммируем все данные о загрузке видеокарт
         let "tGPU += $uGPU"
@@ -80,7 +76,7 @@ TestUtiliz()
         GPUUtiliz
         now=$(date +'%d-%m-%Y %T')
         if [[ $NoCard -gt 0 ]] ; then # Если карты все так же нет в системе, перезагружаемся
-            echo "$now В системе отсутсвует одна или несколько GPU, перезагрузка системы" >> $GPUlog
+            echo "$now Работают не все из $setGPU GPU, перезагрузка системы" >> $GPUlog
             sudo reboot
         else
             echo "$now В системе работают все $setGPU GPU" >> $GPUlog
@@ -89,7 +85,7 @@ TestUtiliz()
     else
         if [[ $NoUtil -gt 1 ]] ; then # Если карты в системе все, но загруюена только одна карта, 
                                       # не работает майнер перезагружаем систему
-            echo "$now Все $setGPU карт работают, но не работает майнер, перезагрузка системы" >> $GPUlog
+            echo "$now Не работает майнер, перезагрузка системы" >> $GPUlog
             sudo reboot
         else
             echo "$now В системе работает все $setGPU GPU" >> $GPUlog
