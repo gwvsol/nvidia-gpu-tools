@@ -1,7 +1,5 @@
 #!/bin/bash
 # testGPU-v6
-# ===========================================================================
-name=testGPU # Имя скрипта
 # ==========================================================================
 dir="/opt/mining" # Каталог для временного config файла
 confDir="/opt/mining"
@@ -38,22 +36,26 @@ GPUUtiliz()
 {
     NoCard=0
     NoUtil=0
-    # Считываем загрузку каждой видеокарты в системе
+    # Считываем загрузку и мощность каждой видеокарты в системе
     for (( i=0; i < $setGPU; i++))
         do
+        #Загрузка видеокарты
         uGPU=$(nvidia-smi --id=$i --query-gpu=utilization.gpu --format=csv | \
             awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-        pGPU=$(bc <<< $(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
-            awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')/1)
-        # Если какой-то видеокарты нет в системе, заменяем отсутствие данных 0
+        #Мощность видеокарты
+        pGPU=$(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
+            awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+        # Если загрузки какой-то видеокарты нет в, заменяем отсутствие данных 0
         if [ -z $uGPU ] ; then
             uGPU=0
         else
             uGPU=$uGPU
         fi
+        # Если загрузка какой-то видеокарты равна 0, увеличиваем переменную $NoUtil на 1
         if [[ $uGPU -lt 1 ]] ; then
             let "NoUtil += 1"
         fi
+        # Если мощности какой-то видеокарты нет в, увеличиваем переменную $NoCard на 1
         if [ -z $pGPU ] ; then
             let "NoCard += 1"
         fi
@@ -73,11 +75,11 @@ TestUtiliz()
 # Проверяем загрузку видеокарт
     GPUUtiliz
     now=$(date +'%d-%m-%Y %T')
-    if [[ $NoCard -gt 0 ]] ; then
+    if [[ $NoCard -gt 0 ]] ; then # Если в системе нет хотя бы одной карты, выполняем повторную проверку
         sleep $time1
         GPUUtiliz
         now=$(date +'%d-%m-%Y %T')
-        if [[ $NoCard -gt 0 ]] ; then
+        if [[ $NoCard -gt 0 ]] ; then # Если карты все так же нет в системе, перезагружаемся
             echo "$now В системе отсутсвует одна или несколько GPU, перезагрузка системы" >> $GPUlog
             sudo reboot
         else
@@ -85,7 +87,8 @@ TestUtiliz()
             exit 0
         fi
     else
-        if [[ $NoUtil -gt 2 ]] ; then 
+        if [[ $NoUtil -gt 1 ]] ; then # Если карты в системе все, но загруюена только одна карта, 
+                                      # не работает майнер перезагружаем систему
             echo "$now Все $setGPU карт работают, но не работает майнер, перезагрузка системы" >> $GPUlog
             sudo reboot
         else
@@ -150,9 +153,8 @@ checkOpt()
     fi 
 }
 
-# Проверяем наличие временного файла настроек проверки видеокарт
-# Если временного файла настроек нет, он будет создан и в него 
-# будет вписана переменная о включении проверки "on"
+# Проверяем наличие временного файла настроек. Если временного файла настроек 
+# нет, он будет создан и в него будет записана переменная "on" о включении проверки 
 testConf() 
 {
     if [ -f $TMPConf ] ; then
@@ -165,6 +167,7 @@ testConf()
     fi 
 }
 
+# Проверяем время работы сисетму, если меньше чем задана переменная $delay, проверка не выполняется
 checkUpTime() 
 {
     if [ $Uptime -lt $delay ] ; then
@@ -173,6 +176,7 @@ checkUpTime()
     fi 
 }
 
+# Проверяем доступность интернета, если не доступен не выполняем провку, так как загрузка при этом равна 0
 testInternet()
 {
     # Проверяем доступность интернета
@@ -185,17 +189,16 @@ testInternet()
     fi
 }
 
+# Основная функция запуска программы
 mainfunction() 
-{
+{ # Если ручное включение программы
     if [ -t 0 ] ; then
-    #   echo $now "$name запущен вручную" >> $GPUlog
        testConf
        testInternet
        checkOpt
        sleep 1
        exit 0
-    else
-    #   echo $now "$name запушен в cron" >> $GPUlog
+    else # Если программа включена через CRON
        testConf
        checkUpTime
        testInternet
