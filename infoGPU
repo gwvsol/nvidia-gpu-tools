@@ -1,21 +1,19 @@
 #!/bin/bash
-GPUConf="/miners/overclock/gpu.cfg" # Где находится файл конфигурации разгона карт
-source $GPUConf
-GPU=$GPU_Number
+GPU=$(lspci | grep NVIDIA | grep VGA | wc -l)
 echo "№GPU" \| "UTL " \| "TMP" \| "FAN" \| " PWR  " \| " CLGPU " \| "CLMEM"
 for (( i=0; i < $GPU; i++))
 do
-uGPU=$(nvidia-smi --id=$i --query-gpu=utilization.gpu --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-tGPU=$(nvidia-smi --id=$i --query-gpu=temperature.gpu --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-pGPU=$(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-gGPU=$(nvidia-smi --id=$i --query-gpu=clocks.gr --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-mGPU=$(nvidia-smi --id=$i --query-gpu=clocks.mem --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-fGPU=$(nvidia-smi --id=$i --query-gpu=fan.speed --format=csv | \
-awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
-echo GPU$i \| $uGPU% \| $tGPU\C \| $fGPU% \| $pGPU\W \| $gGPU\MHz \| $mGPU\MHz
+    uGPU=$(nvidia-smi --id=$i --query-gpu=utilization.gpu --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    tGPU=$(nvidia-smi --id=$i --query-gpu=temperature.gpu --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    pGPU=$(nvidia-smi --id=$i --query-gpu=power.draw --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    gGPU=$(nvidia-smi --id=$i --query-gpu=clocks.gr --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    mGPU=$(nvidia-smi --id=$i --query-gpu=clocks.mem --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    fGPU=$(nvidia-smi --id=$i --query-gpu=fan.speed --format=csv | \
+    awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    echo GPU$i \| $uGPU% \| $tGPU\C \| $fGPU% \| $pGPU\W \| $gGPU\MHz \| $mGPU\MHz
 done
