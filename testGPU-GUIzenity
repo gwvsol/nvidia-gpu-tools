@@ -73,7 +73,7 @@ minAvgGPU() {
     #setGPU=$GPU_Number
     let "n=$setGPU-1"
     mAvGPU=${mavgpu[$n]}
-    echo $(date +'%d-%m-%Y %T')  $mAvGPU%" >> $GPUlog
+    echo $(date +'%d-%m-%Y %T') $minutil $mAvGPU"%" >> $GPUlog
     }
 
     # Проверяем доступность интернета
@@ -90,8 +90,8 @@ TestInternet() {
     # Cчитываем загрузку видеокарт в системе и делаем расчет среднего
     # загрузки видеокарт
 GPUUtiliz() {
-    source $CONF
-    setGPU=$GPU_Number
+    #source $CONF
+    #setGPU=$GPU_Number
     # Считываем загрузку каждой видеокарты в системе
     for (( i=0; i < $setGPU; i++))
     do
