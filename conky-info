@@ -1,0 +1,4 @@
+#!/bin/bash
+msg="/miners/overclock/.conky.msg"
+MSG=$(cat $msg) 
+echo $MSG

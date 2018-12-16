@@ -1,0 +1,281 @@
+#!/bin/bash
+name=menutestGPU
+confDir="/miners/overclock"
+logDir="/miners/log"
+conf="gpu.cfg"
+CONF=$confDir/$conf
+conkym=".conky.msg"
+Conky=$confDir/$conkym
+tmpconf=".gpu.cfg"
+TMPConf=$confDir/$tmpconf
+log="testGPU.log"
+GPUlog=$logDir/$log
+time1=30
+time2=25
+Uptime=$(awk '{print int($1/60)}' /proc/uptime)
+delay=4
+inp=$1
+host="google.com" # Хост, по которому проверяется наличие интернета
+#===============================================
+# Средняя загрузка видеокарт в %
+GPU10=90
+GPU9=89
+GPU8=88
+GPU7=86
+GPU6=84
+GPU5=81
+GPU4=76
+GPU3=67
+GPU2=52
+#=============== MSG Box =======================
+title="Программа проверки работы видеокарт"
+ititle="Info"
+testGPUon="Проверка работы видекарт включена"
+testGPUoff="Проверка работы видекарт отключена"
+testOn="Включить проверку работы видеокарт"
+testOff="Выключить проверку работы видеокарт"
+handTest="Выполнить проверку работы видеокарт"
+sysUpTime="Система включена менее $delay минут"
+inetDown="Соединение с интернетом отсутствует"
+lowUtl="Загрузка GPU низкая, повторная проверка"
+upnormUtil="Загрузка GPU нормализовалась"
+normUtil="Загрузка GPU нормальная"
+reBoot="Перезагрузка системы"
+avrgUtil="Cредняя загрузка"
+titleman="Управление скриптом проверки видеокарт"
+tman="t - проверка работы видеокарт"
+onman="on - включить проверку"
+offman="off - выключить проверку"
+cronman="cron - используется для включения скрипта через cron"
+#===============================================
+    # Проверяем наличие временного файла настроек проверки видеокарт
+    # Если временного файла настроек нет, он будет создан и в него 
+    # будет вписана переменная о включении проверки "on"
+testConf() {
+    if [ -f $TMPConf ] ; then
+       true
+    else : > $TMPConf ; echo "on" > $TMPConf
+    fi
+    if [ -f $Conky ] ; then
+        true
+    else : > $Conky
+    fi }
+
+
+    # Проверка сколько времени c момента включения системы
+    # Если менее установленной $delay скрипт будет выключен
+checkUpTime() {
+    if [ $Uptime -lt $delay ] ; then
+        echo $sysUpTime
+        echo $(date +'%d-%m-%Y %T') $sysUpTime >> $GPUlog
+        exit 0
+    fi }
+
+    # Устанавливаем загрузку видеокарт в зависимости от их кличества
+minAvgGPU() {
+    # Считываем количество видеокарт с файла конфигурации
+    source $CONF
+    setGPU=$GPU_Number
+    if [ $setGPU -eq 10 ] ; then
+        mAvGPU=$GPU10
+    fi
+    if [ $setGPU -eq 9 ] ; then
+        mAvGPU=$GPU9
+    fi
+    if [ $setGPU -eq 8 ] ; then
+        mAvGPU=$GPU8
+    fi
+    if [ $setGPU -eq 7 ] ; then
+        mAvGPU=$GPU7
+    fi
+    if [ $setGPU -eq 6 ] ; then
+        mAvGPU=$GPU6
+    fi
+    if [ $setGPU -eq 5 ] ; then
+        mAvGPU=$GPU5
+    fi
+    if [ $setGPU -eq 4 ] ; then
+        mAvGPU=$GPU4
+    fi
+    if [ $setGPU -eq 3 ] ; then
+        mAvGPU=$GPU3
+    fi
+    if [ $setGPU -le 2 ] ; then
+        mAvGPU=$GPU2
+    fi }
+
+    # Проверяем доступность интернета
+TestInternet() {
+    ping -c 4 -w 10 $host &>/dev/null
+    inet=$?
+    if [ $inet -ge 1 ] ; then 
+    # Интернет не доступен, выходим из программы проверки загрузки видеокарт
+        echo $inetDown > $Conky
+        echo $(date +'%d-%m-%Y %T') $inetDown >> $GPUlog
+        exit 0
+    fi }
+
+    # Cчитываем загрузку видеокарт в системе и делаем расчет среднего
+    # загрузки видеокарт
+GPUUtiliz() {
+    source $CONF
+    setGPU=$GPU_Number
+    # Считываем загрузку каждой видеокарты в системе
+    for (( i=0; i < $setGPU; i++))
+    do
+        uGPU=$(nvidia-smi --id=$i --query-gpu=utilization.gpu --format=csv | \
+            awk 'BEGIN{FS="\n"; RS=""} {print $2}' | awk '{print $1}')
+    # Если какой-то видеокарты нет в системе, заменяем отсутствие данных 0
+        if [ -z $uGPU ] ; then uGPU=0
+        else uGPU=$uGPU
+        fi
+    # Суммируем все данные о загрузке видеокарт
+        let "tGPU += $uGPU"
+    done
+    # Определяем среднюю загрузку видеокарт
+    avGPU=0
+    let "avGPU = $tGPU / $setGPU"
+    tGPU=0
+    echo $(date +'%d-%m-%Y %T') $avrgUtil $setGPU "GPU" $avGPU% >> $GPUlog
+    echo $avrgUtil $setGPU "GPU" $avGPU% > $Conky
+    if [ $setting = "testGPU" ] ; then
+        zenity --info --title="$ititle" --text="$avrgUtil $setGPU "GPU" $avGPU%"\
+         --timeout=3 --width=300 --height=100
+    else
+        echo $avrgUtil $setGPU "GPU" $avGPU%
+    fi
+}
+
+    # Проверяем загрузку видеокарт и при необходимости перезагружаем 
+    # систему
+TestUtiliz() {
+    minAvgGPU
+    if [[ $avGPU -lt $mAvGPU ]] ; then
+       sleep $time1
+       minAvgGPU
+       GPUUtiliz
+        if [[ $avGPU -lt $mAvGPU ]] ; then
+            echo $(date +'%d-%m-%Y %T') $lowUtl >> $GPUlog
+            echo $lowUtl > $Conky
+            if [ $setting = "testGPU" ] ; then
+                zenity --info --title="$ititle" --text="$lowUtl"\
+                --timeout=3 --width=300 --height=100
+            else
+                echo $lowUtl
+    fi
+        else
+            echo $(date +'%d-%m-%Y %T') $upnormUtil >> $GPUlog
+            echo $upnormUtil > $Conky
+            if [ $setting = "testGPU" ] ; then
+                zenity --info --title="$ititle" --text="$upnormUtil"\
+                --timeout=3 --width=300 --height=100
+            else
+                echo $upnormUtil
+            fi
+            exit 0
+        fi
+        sleep $time2
+        minAvgGPU
+        GPUUtiliz
+        if [[ $avGPU -lt $mAvGPU ]] ; then
+            echo $(date +'%d-%m-%Y %T') $reBoot >> $GPUlog
+            echo $reBoot > $Conky
+            if [ $setting = "testGPU" ] ; then
+                zenity --info --title="$ititle" --text="$reBoot"\
+                --timeout=3 --width=300 --height=100
+                sleep 4
+            else
+                echo $reBoot
+                sleep 4
+            fi
+            sudo reboot
+        else
+            echo $(date +'%d-%m-%Y %T') $upnormUtil >> $GPUlog
+            echo $upnormUtil > $Conky
+            if [ $setting = "testGPU" ] ; then
+                zenity --info --title="$ititle" --text="$upnormUtil"\
+                --timeout=3 --width=300 --height=100
+            else
+                echo $upnormUtil
+            fi
+            exit 0
+        fi
+    else
+#        echo $(date +'%d-%m-%Y %T') $normUtil >> $GPUlog
+        exit 0
+    fi }
+
+    # Основная функция управления скриптом проверки видеокарт
+mainSet()
+{
+    if [ $1 = "testGPU" -o $1 = "t" -o $1 = "cron" ] ; then
+        testConf
+        if [ $1 = "cron" ] ; then 
+            checkUpTime 
+            OnOff=$(cat $TMPConf)
+            if [ $OnOff = "off" ] ; then 
+                echo $testGPUoff > $Conky
+                echo $(date +'%d-%m-%Y %T') "CRON" $testGPUoff >> $GPUlog
+                exit 0 
+            fi
+        fi
+        TestInternet
+        GPUUtiliz
+        TestUtiliz 
+        fi
+
+    if [ $1 = "testOn" -o $1 = "on" ] ; then
+        echo $testGPUon > $Conky
+        echo "on" > $TMPConf 
+        echo $(date +'%d-%m-%Y %T') $testGPUon >> $GPUlog
+        if [ $1 = "on" ] ; then
+            echo $testGPUon
+        else 
+            zenity --info --title="$ititle" --text="$testGPUon"\
+             --timeout=3 --width=300 --height=100
+        fi
+    fi
+
+    if [ $1 = "testOff" -o $1 = "off" ] ; then
+        echo $(date +'%d-%m-%Y %T') $testGPUoff >> $GPUlog
+        echo $testGPUoff > $Conky
+        echo "off" > $TMPConf 
+        if [ $1 = "off" ] ; then
+            echo $testGPUoff
+        else 
+            zenity --info --title="$ititle" --text="$testGPUoff"\
+             --timeout=3 --width=300 --height=100
+        fi
+    fi
+
+    if [ $1 = "man" ] ; then
+        echo $titleman
+        echo $tman
+        echo $onman
+        echo $offman
+        echo $cronman 
+    fi
+}
+
+    # GUI интерфейс управления скриптом
+interface() {
+    if [ -z $inp ] ; then
+        OnOff=$(cat $TMPConf)
+        if [ $OnOff = "on" ] ; then
+            txt=$testGPUon
+            setting=$(zenity --list --title="$title" --text="$txt" \
+            --column="Команда" --column="Краткое описание" \
+            --width=400 --height=200 \
+            testGPU "$handTest" \
+            testOff "$testOff")
+        else txt=$testGPUoff
+            setting=$(zenity --list --title="$title" --text="$txt" \
+            --column="Команда" --column="Краткое описание" \
+            --width=400 --height=200 \
+            testGPU "$handTest" \
+            testOn "$testOn")
+        fi
+    else setting=$inp
+    fi }
+interface
+mainSet $setting
