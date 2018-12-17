@@ -1,0 +1,166 @@
+#!/bin/bash
+# ДЛЯ РАБОТЫ СКРИПТА, НЕОБХОДИМО УСТАНОВИТЬ УТИЛИТУ zenity
+# sudo apt install zenity
+CONFDIR="/miners/overclock"
+CONFIG="gpu.cfg"
+LogDir="/miners/log"
+LogFile="gpu.log"
+editor="/usr/bin/xed"
+Set=$1
+#======== TEXT BOX Messeg ======================
+title="Управление разгоном видеокарт"
+wtitle="Предупреждение"
+ititle="Сообщение"
+txt="Выбор элементов управления:"
+setOverclock="Редактировать настройки разгона видеокарт"
+allSet="Применить все настройки разгона видеокарт"
+pwSet="Применить настройки мощности видеокарт"
+fanSet="Применить настройки скорости вентилятора"
+clockSet="Применить настройки частоты графического процессора и видеопамяти"
+SetGPU="Применяем разгон видеокарт"
+NoSetGPU="Отсутствует файл настройки разгона видеокарт"
+ttitle="Для управления разгоном введите:"
+tmsgpw="pw - ограничение мощности карт"
+tmsgfan="fan - ограничение вращения кулеров"
+tmsgcl="clock - примение разгона карт"
+tmsgall="all - применение всех параметров"
+#===============================================
+# Применяем разгон видеокарт в зависимости от переданного параметра
+# all - применяем все параметры разгона
+# pw - изменяем органичение мощности видеокарт
+# fan - изменяем частоту вращения вентиляторов
+# clock - изеняем частоту работы графического процессора и видеопамяти
+# man - справка по работе со скриптом
+# Если запустить скрипт без параметров, включиться
+# GUI интерфейс управления разгоном видеокарт
+# сделанный на основе утилиты Zenity
+# ==============================================
+
+# Проверяем доступен ли файл конфигурации разгона видеокарт
+ovnConfig() { 
+    if [ -f $CONFDIR/$CONFIG ] ; then
+        if [ -z "$Set" ] ; then
+            zenity --info --title="$ititle" --text="$SetGPU" --timeout=3 --width=300 --height=100
+        else echo "$SetGPU" ; echo
+        fi
+    else 
+        if [ -z "$Set" ] ; then
+            zenity --error --title="$wtitle" --text="$NoSetGPU" --timeout=3 --width=300 --height=100
+        else echo "$NoSetGPU" ; echo
+        fi
+	    exit 1
+    fi
+}
+# Основная функция разгона видеокарт
+mainSet()
+{
+    source $CONFDIR/$CONFIG # Подключаем файл с настройками разгона видеокарт 
+    
+    if [ $1 = "edit" ] ; then # Включаем редактор файла настроек
+        $editor $CONFDIR/$CONFIG
+    fi 
+
+    if [ $1 = "man" ] ; then # Выводим в терминале небольшой ман по работе со скриптом
+        echo "$ttitle"
+        echo "$tmsgpw"
+        echo "$tmsgfan"
+        echo "$tmsgcl"
+        echo "$tmsgall"
+    fi
+
+    for ((i=0; i < $GPU_Number; i++)) # Функция применения разгона видеокарт
+	do 
+    	if [ $1 = "all" ] ; then # Применяются все параметры разгона
+            FAN=FAN_SPEED_$i; POWER=GPU_Power_$i; MEMCL=GPU_Mem_Clock_$i; GPUCL=GPU_Clock_$i
+            Info="GPU$i Enable FAN ${!FAN}% Power ${!POWER}% MemClock ${!MEMCL} GPUClock ${!GPUCL}"
+            date +'%d-%m-%Y %T' >> $LogDir/$LogFile	
+            if [ -z "$Set" ] ; then
+                zenity --info --title="$ititle" --text="$Info" --timeout=3 --width=300 --height=100
+            else echo "$Info" ; echo
+            fi
+		    sudo nvidia-smi --id=$i --power-limit=${!POWER} &>>$LogDir/$LogFile 
+		    nvidia-settings -a "[gpu:$i]/GPUFanControlState=1" &>>$LogDir/$LogFile 
+            nvidia-settings -a "[fan:$i]/GPUTargetFanSpeed=${!FAN}" &>>$LogDir/$LogFile
+		    nvidia-settings -a "[gpu:$i]/GPUMemoryTransferRateOffset[3]=${!MEMCL}" &>>$LogDir/$LogFile
+            nvidia-settings -a "[gpu:$i]/GPUGraphicsClockOffset[3]=${!GPUCL}" &>>$LogDir/$LogFile
+    		fi
+    		
+		if [ $1 = "pw" ] ; then # Применяюся только параметры по мощности карт
+     		POWER=GPU_Power_$i
+            Info="GPU$i Enable Power Limit ${!POWER}%"
+            date +'%d-%m-%Y %T' >> $LogDir/$LogFile	
+                if [ -z "$Set" ] ; then
+                    zenity --info --title="$ititle" --text="$Info" --timeout=3 --width=300 --height=100
+                else echo "$Info" ; echo
+                fi
+		    sudo nvidia-smi --id=$i --power-limit=${!POWER} &>>$LogDir/$LogFile
+		    sleep 1
+    		fi
+
+    	if [ $1 = "fan" ] ; then # Применяются только параметры скорости вращения вентиляторов
+     		FAN=FAN_SPEED_$i
+     		Info="GPU$i Enable FAN SPEED ${!FAN}%" 
+            date +'%d-%m-%Y %T' >> $LogDir/$LogFile	
+                if [ -z "$Set" ] ; then
+                    zenity --info --title="$ititle" --text="$Info" --timeout=3 --width=300 --height=100
+                else echo "$Info" ; echo
+                fi
+		    nvidia-settings -a "[gpu:$i]/GPUFanControlState=1" &>>$LogDir/$LogFile
+     		nvidia-settings -a "[fan:$i]/GPUTargetFanSpeed=${!FAN}" &>>$LogDir/$LogFile
+    		fi
+
+    		if [ $1 = "clock" ] ; then # Применяются только параметры частоты GPU и видеопамяти
+     		MEMCL=GPU_Mem_Clock_$i; GPUCL=GPU_Clock_$i
+     		Info="GPU$i Enable MemClock ${!MEMCL} GPUClock ${!GPUCL}"
+            date +'%d-%m-%Y %T' >> $LogDir/$LogFile	
+                if [ -z "$Set" ] ; then
+                    zenity --info --title="$ititle" --text="$Info" --timeout=3 --width=300 --height=100
+                else echo "$Info" ; echo
+                fi
+		    nvidia-settings -a "[gpu:$i]/GPUMemoryTransferRateOffset[3]=${!MEMCL}" &>>$LogDir/$LogFile
+     		nvidia-settings -a "[gpu:$i]/GPUGraphicsClockOffset[3]=${!GPUCL}" &>>$LogDir/$LogFile
+    		fi
+	done
+}
+
+# GUI интерфейс управления скриптом
+interface() {
+setting=$(zenity --list --title="$title" \
+       --text="$txt" \
+       --column="Команда" --column="Краткое описание" \
+       --width=570 --height=250 \
+       edit "$setOverclock" \
+       all "$allSet" \
+       pw "$pwSet" \
+       fan "$fanSet" \
+       clock "$clockSet")
+}
+
+# Основная функция работы скрипта из которой вызываеются все остаальные функции
+main()
+{
+# Если нет параметров переданных скрипту, включается GUI интерфейс
+    if [ -z "$Set" ] ; then
+        interface
+# Если вышли из GUI интерфейса, работа скрипта не продолжается
+        if [ -n "$setting" ] ; then
+# Если выбран пункт редактирования файла настроек, ничего другого из скрипта не включается
+            if [ $setting != "edit" ] ; then
+                ovnConfig
+            fi
+            mainSet $setting
+        else
+            exit 1
+        fi
+    else
+# Эта часть обрабатывает только все что включается из терминала
+        setting=$Set
+# Если скрипту передан параметр man, все остальные функции не включаются
+        if [ $Set != "man" ] ; then
+            ovnConfig
+        fi
+        mainSet $setting
+    fi
+}
+
+main

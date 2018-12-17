@@ -1,0 +1,65 @@
+#!/bin/bash
+CONFDIR="/home/work"
+CONFIG="gpu.cfg"
+# Проверяем доступен ли файл конфигурации разгона видеокарт
+if [ -f $CONFDIR/$CONFIG ] ; then
+	echo "Применяем разгон видеокарт"
+	echo
+else 
+	echo "Отсутствует файл конфигурации разгона видеокарт"
+	exit 1
+fi
+
+export DISPLAY=:0
+export XAUTHORITY=/var/run/lightdm/root/:0
+source $CONFDIR/$CONFIG
+# Применяем разгон видеокарт в зависимости от переданного параметра
+# all - применяем все параметры разгона
+# pw - изменяем органичение мощности видеокарт
+# fan - изменяем частоту вращения вентиляторов
+# clock - изеняем частоту работы графического процессора и видеопамяти
+if [ -n "$1" ] ; then
+    for ((i=0; i < $GPU_Number; i++))
+	do 
+    		if [ $1 = "all" ] ; then
+     		FAN=FAN_SPEED_$i; POWER=GPU_Power_$i; MEMCL=GPU_Mem_Clock_$i; GPUCL=GPU_Clock_$i
+     		echo GPU$i Enable FAN ${!FAN}%\; Power ${!POWER}%\; MemClock ${!MEMCL}\; GPUClock ${!GPUCL}
+		echo
+		sudo nvidia-smi --id=$i --power-limit=${!POWER} &>/dev/null 
+		nvidia-settings -a "[gpu:$i]/GPUFanControlState=1" &>/dev/null 
+                nvidia-settings -a "[fan:$i]/GPUTargetFanSpeed=${!FAN}" &>/dev/null
+		nvidia-settings -a "[gpu:$i]/GPUMemoryTransferRateOffset[3]=${!MEMCL}" &>/dev/null
+                nvidia-settings -a "[gpu:$i]/GPUGraphicsClockOffset[3]=${!GPUCL}" &>/dev/null
+    		fi
+    		
+		if [ $1 = "pw" ] ; then
+     		POWER=GPU_Power_$i
+     		echo GPU$i Enable Power Limit ${!POWER}%
+     		echo
+		sudo nvidia-smi --id=$i --power-limit=${!POWER} &>/dev/null
+        sleep 1
+    		fi
+
+    		if [ $1 = "fan" ] ; then
+     		FAN=FAN_SPEED_$i
+     		echo GPU$i Enable FAN SPEED ${!FAN}%
+     		echo
+		nvidia-settings -a "[gpu:$i]/GPUFanControlState=1" &>/dev/null
+     		nvidia-settings -a "[fan:$i]/GPUTargetFanSpeed=${!FAN}" &>/dev/null
+    		fi
+
+    		if [ $1 = "clock" ] ; then
+     		MEMCL=GPU_Mem_Clock_$i; GPUCL=GPU_Clock_$i
+     		echo GPU$i Enable MemClock ${!MEMCL}\; GPUClock ${!GPUCL}
+     		echo
+		nvidia-settings -a "[gpu:$i]/GPUMemoryTransferRateOffset[3]=${!MEMCL}" &>/dev/null
+     		nvidia-settings -a "[gpu:$i]/GPUGraphicsClockOffset[3]=${!GPUCL}" &>/dev/null
+    		fi
+	done
+else
+  echo "Для управления разгоном введите:"
+  echo "pw - ограничение мощности карт"
+  echo "fan - ограничение вращения кулеров"
+  echo "clock - примение разгона карт"
+  echo "all - применение всех параметров"
+fi
