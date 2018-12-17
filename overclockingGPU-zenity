@@ -7,6 +7,7 @@ LogDir="/miners/log"
 LogFile="gpu.log"
 editor="/usr/bin/xed"
 Set=$1
+GPU_Number=$(lspci | grep NVIDIA | grep VGA | wc -l)
 #======== TEXT BOX Messeg ======================
 title="Управление разгоном видеокарт"
 wtitle="Предупреждение"

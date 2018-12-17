@@ -9,7 +9,7 @@ else
 	echo "Отсутствует файл конфигурации разгона видеокарт"
 	exit 1
 fi
-
+GPU_Number=$(lspci | grep NVIDIA | grep VGA | wc -l)
 export DISPLAY=:0
 export XAUTHORITY=/var/run/lightdm/root/:0
 source $CONFDIR/$CONFIG
